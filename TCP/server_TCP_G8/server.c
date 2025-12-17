@@ -59,7 +59,7 @@ void chiudi(int socket) {
 
 void start(int socket)
 {
-	assegnaIndirizzo();
+	//assegnaIndirizzo();
 }
 
 
