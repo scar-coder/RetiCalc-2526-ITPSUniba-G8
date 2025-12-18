@@ -44,7 +44,7 @@ void ClearWinSock() {
 
 int creaSocket() {
 	int MySocket;
-	MySocket = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
+	MySocket = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
 	return MySocket;
 }
 
