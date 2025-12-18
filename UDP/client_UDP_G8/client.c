@@ -6,7 +6,6 @@
  */
 
 
-
 #if defined WIN32
 
 #include <winsock.h>
@@ -33,18 +32,6 @@ void ErrorHandler(char *errorMessage) {
 }
 
 
-int initWinsock() {
-	#if defined WIN32
-	WSADATA wsaData;
-	int iResult = WSAStartup(MAKEWORD(2,2), &wsaData);
-	if(iResult != 0) {
-		ErrorHandler("Error at WSAStartup()\n");
-		return 0;
-	}
-	printf ("winsock inizializzato\n");
-	return iResult;
-	#endif
-}
 
 
 void ClearWinSock() {
@@ -55,20 +42,14 @@ void ClearWinSock() {
 }
 
 
-int creaSocket(){
+int creaSocket() {
 	int MySocket;
 	MySocket = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
-	if (MySocket < 0) {
-		ErrorHandler("socket creation failed.\n");
-		ClearWinSock();
-		return -1;
-	}
-	printf("Socket creato\n");
 	return MySocket;
 }
 
 
-void chiudi(int socket){
+void chiudi(int socket) {
 
 	closesocket(socket);
 	printf("Socket chiuso\n");
@@ -77,21 +58,31 @@ void chiudi(int socket){
 
 
 
-void start(int socket)
+int main()
 {
+	//inizializza winsock
+	#if defined WIN32
+	WSADATA wsaData;
+	int iResult = WSAStartup(MAKEWORD(2,2), &wsaData);
+	#endif
+	if(iResult != 0) {
+		ErrorHandler("Error at WSAStartup()\n");
+		return 0;
+	}
+	else printf ("winsock inizializzato\n");
 
 
-
-}
-
-
-
-int main() {
-
-	initWinsock();
-
+	//crea socket
 	int socket = creaSocket();
-	start(socket);
+	if (socket < 0) {
+		ErrorHandler("socket creation failed.\n");
+		ClearWinSock();
+		return -1;
+	}
+	else printf("Socket creato\n");
+
+
+
 	chiudi(socket);
 
 	ClearWinSock();
