@@ -135,22 +135,25 @@ int main(void)
 
 
 	// RICEVERE DATI DAL SERVER
-	int bytesRcvd;
-	int totalBytesRcvd = 0;
-	char buf[BUFFERSIZE];   // buffer for data from the server
-	ErrorHandler("Received: ");   // Setup to print the echoed string
 
-	while (totalBytesRcvd < stringLen) {
-	if ((bytesRcvd = recv(socket, buf, BUFFERSIZE - 1, 0)) <= 0) {
-	ErrorHandler("recv() failed or connection closed prematurely");
-	chiudi(socket);
-	ClearWinSock();
-	return -1;
+	int bytesRcvd;
+	char buf[BUFFERSIZE];
+
+	ErrorHandler("Received: ");
+
+	while ((bytesRcvd = recv(socket, buf, BUFFERSIZE - 1, 0)) > 0) {
+		if (bytesRcvd <= 0) {
+			ErrorHandler("recv() failed or connection closed prematurely");
+			chiudi(socket);
+			ClearWinSock();
+			return -1;
+			}
+	    buf[bytesRcvd] = '\0';
+	    ErrorHandler(buf);
 	}
-	totalBytesRcvd += bytesRcvd; // Keep tally of total bytes
-	buf[bytesRcvd] = '\0'; // Add \0 so printf knows where to stop
-	ErrorHandler(buf); // Print the echo buffer
-	}
+
+	ErrorHandler("\n");
+
 
 	chiudi(socket);
 

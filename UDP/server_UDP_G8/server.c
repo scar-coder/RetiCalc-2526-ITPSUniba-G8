@@ -1,135 +1,130 @@
 /*
- * client.c
+ * server_UDP_G8.c
  *
  *  Created on: 11 dic 2025
- *      Author: Danilo Scarpino, Cristina Balestra
+ *  Author: Danilo Scarpino, Cristina Balestra
  */
 
-
 #if defined WIN32
-
 #include <winsock.h>
-
 #else
-
 #define closesocket close
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <unistd.h>
-
+#include <netdb.h>
 #endif
 
-
 #include <stdio.h>
-#include <stdlib.h> // for atoi()
+#include <string.h>
+#include <stdlib.h>
 
-#define ECHOMAX 255
-#define PORT 48000
+#define PORT 27015
+#define BUFSIZE 512
 
-
-
-void ErrorHandler(char *errorMessage) {
-	printf ("%s", errorMessage);
+void ErrorHandler(char *msg) {
+    printf("%s", msg);
+    fflush(stdout);
 }
-
-
-
 
 void ClearWinSock() {
-	#if defined WIN32
-	WSACleanup();
-	printf ("winsock pulito\n");
-	#endif
+#if defined WIN32
+    WSACleanup();
+#endif
 }
 
+int main() {
 
-int creaSocket() {
-	int MySocket;
-	MySocket = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
-	return MySocket;
-}
+#if defined WIN32
+    WSADATA wsaData;
+    int iResult = WSAStartup(MAKEWORD(2,2), &wsaData);
+    if (iResult != 0) {
+        ErrorHandler("WSAStartup failed\n");
+        return 1;
+    }
+#endif
 
+    int sock;
+    struct sockaddr_in servAddr, clntAddr;
+    int clntLen;                  /* Windows: usare int */
+    char buffer[BUFSIZE];
 
-void chiudi(int socket) {
+    /* CREAZIONE SOCKET UDP */
+    sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (sock < 0) {
+        ErrorHandler("socket() failed\n");
+        return 1;
+    }
 
-	closesocket(socket);
-	printf("Socket chiuso\n");
-}
+    /* BIND */
+    memset(&servAddr, 0, sizeof(servAddr));
+    servAddr.sin_family = AF_INET;
+    servAddr.sin_port = htons(PORT);
+    servAddr.sin_addr.s_addr = INADDR_ANY;
 
+    if (bind(sock, (struct sockaddr*)&servAddr, sizeof(servAddr)) < 0) {
+        ErrorHandler("bind() failed\n");
+        closesocket(sock);
+        ClearWinSock();
+        return 1;
+    }
 
+    printf("Server UDP in ascolto...\n");
+    fflush(stdout);
 
+    while (1) {
+        clntLen = sizeof(clntAddr);
 
-int main()
-{
-	//inizializza winsock
-	#if defined WIN32
-	WSADATA wsaData;
-	int iResult = WSAStartup(MAKEWORD(2,2), &wsaData);
-	#endif
-	if(iResult != 0) {
-		ErrorHandler("Error at WSAStartup()\n");
-		return 0;
-	}
-	else printf ("winsock inizializzato\n");
+        /* 1️⃣ Ricezione "Hello" */
+        int bytes = recvfrom(sock, buffer, BUFSIZE - 1, 0,
+                             (struct sockaddr*)&clntAddr, &clntLen);
+        if (bytes <= 0)
+            continue;
 
+        buffer[bytes] = '\0';
 
-	//crea socket
-	unsigned int cliAddrLen;
-	char echoBuffer[ECHOMAX];
-	int recvMsgSize;
-	int socket = creaSocket();
-	if (socket < 0) {
-		ErrorHandler("socket creation failed.\n");
-		ClearWinSock();
-		return -1;
-	}
-	else printf("Socket creato\n");
+        /* DNS inverso */
+        struct hostent *he = gethostbyaddr(
+            (char*)&clntAddr.sin_addr,
+            sizeof(clntAddr.sin_addr),
+            AF_INET
+        );
 
-	/// ASSEGNAZIONE DI UN INDIRIZZO ALLA SOCKET
-	int port;
-	port = PORT; // use default port number
-	char* addr;
-	addr = "127.0.0.1";
-	struct sockaddr_in echoServAddr;
-	memset(&echoServAddr, 0, sizeof(echoServAddr)); // ensures that extra bytes contain 0
-	echoServAddr.sin_family = AF_INET;
-	echoServAddr.sin_port = htons(port);
-	echoServAddr.sin_addr.s_addr = inet_addr(addr);
+        printf("Ricevuti dati dal client nome: %s indirizzo: %s\n",
+               he ? he->h_name : "sconosciuto",
+               inet_ntoa(clntAddr.sin_addr));
+        fflush(stdout);
 
-	struct sockaddr_in sad; /* converts values between the host and
-	network byte order. Specifically, htons() converts 16-bit quantities
-	from host byte order to network byte order. */
-	if ((bind(socket, (struct sockaddr *)&echoServAddr, sizeof(echoServAddr))) < 0) {
-	printf("bind() failed: %d\n", WSAGetLastError());
-	closesocket(socket);
-	ClearWinSock();
-	return -1;
-	}
-	else
-		{
-		char err_buffer[100];
-		sprintf(err_buffer, "Socket assegnato a %s:%d\n", addr, port);
-		ErrorHandler(err_buffer);
-		}
+        /* 2️⃣ Ricezione stringa */
+        bytes = recvfrom(sock, buffer, BUFSIZE - 1, 0,
+                         (struct sockaddr*)&clntAddr, &clntLen);
+        if (bytes <= 0)
+            continue;
 
+        buffer[bytes] = '\0';
 
-	// RICEZIONE DELLA STRINGA ECHO DAL CLIENT
-	struct sockaddr_in echoClntAddr;
-	while(1) {
-	cliAddrLen = sizeof(echoClntAddr);
-	recvMsgSize = recvfrom(socket, echoBuffer, ECHOMAX, 0, (struct
-	sockaddr*)&echoClntAddr, &cliAddrLen);
-	printf("Handling client %s\n", inet_ntoa(echoClntAddr.sin_addr));
-	printf("Received: %s\n", echoBuffer);
+        printf("Stringa ricevuta: %s\n", buffer);
+        fflush(stdout);
 
-	// RINVIA LA STRINGA ECHO AL CLIENT
-	if (sendto(socket, echoBuffer, recvMsgSize, 0, (struct sockaddr *)&echoClntAddr,
-	sizeof(echoClntAddr)) != recvMsgSize)
-	ErrorHandler("sendto() sent different number of bytes than expected");
-	}
+        /* 3️⃣ Eliminazione vocali */
+        char filtered[BUFSIZE];
+        int j = 0;
 
-	chiudi(socket);
+        for (int i = 0; buffer[i] != '\0'; i++) {
+            char c = buffer[i];
+            if (!(c=='a'||c=='e'||c=='i'||c=='o'||c=='u'||
+                  c=='A'||c=='E'||c=='I'||c=='O'||c=='U')) {
+                filtered[j++] = c;
+            }
+        }
+        filtered[j] = '\0';
 
-	ClearWinSock();
-	return 0;
+        /* 4️⃣ Invio risposta */
+        sendto(sock, filtered, strlen(filtered), 0,
+               (struct sockaddr*)&clntAddr, clntLen);
+    }
+
+    closesocket(sock);
+    ClearWinSock();
+    return 0;
 }
